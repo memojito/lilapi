@@ -78,10 +78,11 @@ func (api *api) createWorkspace(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(400), 400)
 		return
 	}
-	if workspace.ID.String() == "" {
-		workspace.ID = gocql.TimeUUID()
+	log.Printf("Workspace.ID =%v", workspace.ID)
+	if workspace.ID.String() == "00000000-0000-0000-0000-000000000000" {
+		workspace.ID, _ = gocql.RandomUUID()
 	}
-	if err := api.session.Query(`INSERT INTO workspace (id, owner, photographer, size, name, facet_ids) VALUES (?, ?, ?, ?, ?, ?)`,
+	if err := api.session.Query(`INSERT INTO workspace (id, owner, editor, size, name, facet_ids) VALUES (?, ?, ?, ?, ?, ?)`,
 		workspace.ID, workspace.Owner, workspace.Editor, workspace.Size, workspace.Name, workspace.FacetIDs).Exec(); err != nil {
 		log.Println(err)
 		http.Error(w, http.StatusText(500), 500)
