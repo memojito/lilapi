@@ -26,6 +26,8 @@ services:
     container_name: lilapi-server
     ports:
       - "8080:8080"
+    command:
+      -address=":8080"
     build:
       context: .
     restart: unless-stopped
