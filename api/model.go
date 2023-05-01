@@ -1,1 +1,4 @@
-package endpoints
+package api
+
+type ApiEntity struct {
+}
