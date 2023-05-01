@@ -8,12 +8,17 @@ services:
       - "CASSANDRA_CLUSTER_NAME=my-cassandra-cluster"
     ports:
       - "9042:9042"
+    expose:
+      - "9042"
+      - "7000"
+      - "7001"
+      - "9160"
     volumes:
       - ./data:/var/lib/cassandra
       - ./db-init.sh:/docker-entrypoint-initdb.d/db-init.sh
       - ./db/scripts/create-keyspace.cql:/docker-entrypoint-initdb.d/db/scripts/create-keyspace.cql
       - ./db/scripts/schema.cql:/docker-entrypoint-initdb.d/db/scripts/schema.cql
-    restart: always
+    restart: unless-stopped
 
   server:
     depends_on:
@@ -23,4 +28,4 @@ services:
       - "8080:8080"
     build:
       context: .
-    restart: always
+    restart: unless-stopped

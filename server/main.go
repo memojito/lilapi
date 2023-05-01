@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	address := flag.String("address", "localhost:8080", "The address to listen to")
+	address := flag.String("address", "8080", "The address to listen to")
 
 	session, err := db.NewSession()
 	if err != nil {

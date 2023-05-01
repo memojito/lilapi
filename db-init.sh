@@ -2,10 +2,10 @@
 
 # Execute the scripts in order
 echo "Creating keyspace..."
-cqlsh -f db/scripts/create-keyspace.cql
+cqlsh -f docker-entrypoint-initdb.d/db/scripts/create-keyspace.cql
 
 echo "Creating table..."
-cqlsh -f db/scripts/schema.cql
+cqlsh -f docker-entrypoint-initdb.d/db/scripts/schema.cql
 
 echo "CQL commands executed successfully!"
 exit
