@@ -1,4 +1,4 @@
 package api
 
-type ApiEntity struct {
+type Entity struct {
 }

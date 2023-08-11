@@ -5,6 +5,7 @@
 *.so
 *.dylib
 .idea
+.env
 /data
 
 # Test binary, built with `go test -c`

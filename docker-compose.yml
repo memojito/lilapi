@@ -24,6 +24,8 @@ services:
     depends_on:
       - cassandra
     container_name: lilapi-server
+    environment:
+      - "TELEGRAM_BOT_API_TOKEN=${TELEGRAM_BOT_API_TOKEN}"
     ports:
       - "8080:8080"
     command:

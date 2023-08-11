@@ -9,20 +9,10 @@ import (
 	"net/http"
 )
 
-type Workspace struct {
-	ID       gocql.UUID   `json:"id"`
-	Owner    string       `json:"owner"`
-	Editor   string       `json:"editor"`
-	Size     int          `json:"size"`
-	Name     string       `json:"name"`
-	FacetIDs []gocql.UUID `json:"facet_ids"`
-}
-
-type Facet struct {
-	ID           gocql.UUID   `json:"id"`
-	Name         string       `json:"name"`
-	Value        string       `json:"value"`
-	WorkspaceIDs []gocql.UUID `json:"workspace_ids"`
+type Transaction struct {
+	ID    gocql.UUID `json:"id"`
+	Name  string     `json:"name"`
+	Value int        `json:"value"`
 }
 
 type api struct {
@@ -45,61 +35,42 @@ func (api *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *api) routes() {
-	api.router.Route("/workspace", func(r chi.Router) {
-		r.Get("/{id}", api.getWorkspace)
-		r.Post("/", api.createWorkspace)
+	api.router.Route("/transaction", func(r chi.Router) {
+		r.Get("/{id}", api.getTransaction)
+		r.Post("/", api.createTransaction)
 		//r.Put("/{id}", api.updateWorkspace)	// coming soon
 		//r.Delete("/{id}", api.deleteWorkspace)
 	})
-
-	api.router.Route("/facets", func(r chi.Router) {
-		r.Get("/{id}", api.getFacet)
-		//r.Post("/", api.createFacet)	// coming soon
-		//r.Put("/{id}", api.updateFacet)
-		//r.Delete("/{id}", api.deleteFacet)
-	})
 }
 
-func (api *api) getWorkspace(w http.ResponseWriter, r *http.Request) {
+func (api *api) getTransaction(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	workspace := Workspace{}
-	if err := api.session.Query(`SELECT id, owner, editor, size, name, facet_ids FROM workspace WHERE id = ?`, id).Scan(&workspace.ID, &workspace.Owner, &workspace.Editor, &workspace.Size, &workspace.Name, &workspace.FacetIDs); err != nil {
+	transaction := Transaction{}
+	if err := api.session.Query(`SELECT id, name, value FROM transaction WHERE id = ?`, id).Scan(&transaction.ID, &transaction.Name, &transaction.Value); err != nil {
 		log.Println(err)
 		http.Error(w, http.StatusText(404), 404)
 		return
 	}
-	json.NewEncoder(w).Encode(workspace)
+	json.NewEncoder(w).Encode(transaction)
 }
 
-func (api *api) createWorkspace(w http.ResponseWriter, r *http.Request) {
-	workspace := Workspace{}
-	if err := json.NewDecoder(r.Body).Decode(&workspace); err != nil {
+func (api *api) createTransaction(w http.ResponseWriter, r *http.Request) {
+	transaction := Transaction{}
+	if err := json.NewDecoder(r.Body).Decode(&transaction); err != nil {
 		log.Println(err)
 		http.Error(w, http.StatusText(400), 400)
 		return
 	}
-	log.Printf("Workspace.ID =%v", workspace.ID)
-	if workspace.ID.String() == "00000000-0000-0000-0000-000000000000" {
-		workspace.ID, _ = gocql.RandomUUID()
+	log.Printf("Transaction.ID =%v", transaction.ID)
+	if transaction.ID.String() == "00000000-0000-0000-0000-000000000000" {
+		transaction.ID, _ = gocql.RandomUUID()
 	}
-	if err := api.session.Query(`INSERT INTO workspace (id, owner, editor, size, name, facet_ids) VALUES (?, ?, ?, ?, ?, ?)`,
-		workspace.ID, workspace.Owner, workspace.Editor, workspace.Size, workspace.Name, workspace.FacetIDs).Exec(); err != nil {
+	if err := api.session.Query(`INSERT INTO transaction (id, name, value) VALUES (?, ?, ?)`,
+		transaction.ID, transaction.Name, transaction.Value).Exec(); err != nil {
 		log.Println(err)
 		http.Error(w, http.StatusText(500), 500)
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(workspace)
-}
-
-func (api *api) getFacet(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	facet := Facet{}
-	if err := api.session.Query(`SELECT name, value, workspace_ids FROM facets WHERE id = ?`, id).Scan(&facet.Name,
-		&facet.Value, &facet.WorkspaceIDs); err != nil {
-		log.Println(err)
-		http.Error(w, http.StatusText(404), 404)
-		return
-	}
-	json.NewEncoder(w).Encode(facet)
+	json.NewEncoder(w).Encode(transaction)
 }
