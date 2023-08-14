@@ -18,12 +18,14 @@ type Transaction struct {
 type api struct {
 	router  *chi.Mux
 	session *gocql.Session
+	token   string
 }
 
-func NewAPI(session *gocql.Session) *api {
+func NewAPI(session *gocql.Session, token string) *api {
 	api := &api{
 		router:  chi.NewRouter(),
 		session: session,
+		token:   token,
 	}
 	api.router.Use(middleware.Logger)
 	api.routes()
