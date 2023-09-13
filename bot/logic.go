@@ -1,11 +1,21 @@
 package bot
 
 import (
+	"errors"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/gocql/gocql"
+	"github.com/memojito/lilapi/db"
 	"log"
+	"strconv"
+	"strings"
 )
 
-func InitBot(token string) {
+type Transaction struct {
+	name  string
+	price int
+}
+
+func InitBot(token string, session *gocql.Session) {
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		log.Panic(err)
@@ -18,16 +28,27 @@ func InitBot(token string) {
 	update := tgbotapi.NewUpdate(0)
 	update.Timeout = 60
 
-	updateBot(bot, update)
+	s := &db.Session{Session: session}
+
+	updateBot(bot, update, s)
 }
 
-func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig) {
+func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, session *db.Session) {
 	updates := bot.GetUpdatesChan(update)
 
 	for u := range updates {
 		if u.Message != nil { // If we got a message
 			if u.Message.IsCommand() {
 				handleCommand(bot, u.Message)
+			} else {
+				transaction, err := handleTransaction(bot, u.Message)
+				if err != nil {
+					msg := tgbotapi.NewMessage(u.Message.Chat.ID, "Invalid Transaction!")
+					bot.Send(msg)
+				} else {
+					// save transaction
+					session.SaveTransaction(transaction.name, transaction.price)
+				}
 			}
 		} else if u.CallbackQuery != nil {
 			handleCallbackQuery(bot, u.CallbackQuery)
@@ -35,13 +56,26 @@ func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig) {
 	}
 }
 
-func genReply(bot *tgbotapi.BotAPI, message *tgbotapi.Message) tgbotapi.MessageConfig {
-	log.Printf("[%s] %s", message.From.UserName, message.Text)
+func handleTransaction(bot *tgbotapi.BotAPI, message *tgbotapi.Message) (Transaction, error) {
+	parts := strings.Fields(message.Text)
+	if len(parts) != 2 {
+		return Transaction{}, errors.New("Invalid Transaction!")
+	}
 
-	msg := tgbotapi.NewMessage(message.Chat.ID, message.Text)
-	msg.ReplyToMessageID = message.MessageID
+	name := parts[0]
 
-	return msg
+	priceStr := strings.ReplaceAll(parts[1], ",", "")
+	priceStr = strings.ReplaceAll(priceStr, ".", "")
+
+	price, err := strconv.Atoi(priceStr)
+	if err != nil {
+		return Transaction{}, errors.New("Invalid Transaction!")
+	}
+
+	return Transaction{
+		name:  name,
+		price: price,
+	}, nil
 }
 
 func genGuide(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
