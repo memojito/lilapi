@@ -27,20 +27,15 @@ func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig) {
 	for u := range updates {
 		if u.Message != nil { // If we got a message
 			if u.Message.IsCommand() {
-				HandleCommand(u.Message)
+				handleCommand(bot, u.Message)
 			}
-			msg := GenReply(u.Message)
-
-			_, err := bot.Send(msg)
-			if err != nil {
-				log.Printf("Failed to send message %v", err)
-				return
-			}
+		} else if u.CallbackQuery != nil {
+			handleCallbackQuery(bot, u.CallbackQuery)
 		}
 	}
 }
 
-func GenReply(message *tgbotapi.Message) tgbotapi.MessageConfig {
+func genReply(bot *tgbotapi.BotAPI, message *tgbotapi.Message) tgbotapi.MessageConfig {
 	log.Printf("[%s] %s", message.From.UserName, message.Text)
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, message.Text)
@@ -49,16 +44,50 @@ func GenReply(message *tgbotapi.Message) tgbotapi.MessageConfig {
 	return msg
 }
 
-func HandleCommand(message *tgbotapi.Message) tgbotapi.MessageConfig {
+func genGuide(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
+	var msg tgbotapi.MessageConfig
+	msg = tgbotapi.NewMessage(message.Chat.ID, "Right now I can help you to count your daily expenses and give you some statistics.")
+	bot.Send(msg)
+
+	msg = tgbotapi.NewMessage(message.Chat.ID, "Start by entering the name of the expense and the price in euros. Here is an example:")
+	bot.Send(msg)
+
+	msg = tgbotapi.NewMessage(message.Chat.ID, "coffee 3,29")
+	bot.Send(msg)
+}
+
+func handleCallbackQuery(bot *tgbotapi.BotAPI, cq *tgbotapi.CallbackQuery) {
+	var answer tgbotapi.CallbackConfig
+
+	answer = tgbotapi.NewCallback(cq.ID, cq.Data)
+	bot.Send(answer)
+
+	switch cq.Data {
+	case "I will!":
+		genGuide(bot, cq.Message)
+	case "Have fun!":
+		msg := tgbotapi.NewMessage(cq.Message.Chat.ID, "What did you spend today?")
+		bot.Send(msg)
+	}
+}
+
+func handleCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
 	log.Printf("[%s] %s", message.From.UserName, message.Text)
 	var msg tgbotapi.MessageConfig
 
+	helpButton := tgbotapi.NewInlineKeyboardButtonData("Help me", "I will!")
+	skipButton := tgbotapi.NewInlineKeyboardButtonData("Skip", "Have fun!")
+
 	if message.Text == "/start" {
 		msg = tgbotapi.NewMessage(message.Chat.ID, "Welcome! This bot helps you to get more control over your expenses")
-	} else if message.Text == "/help" {
+		bot.Send(msg)
 		msg = tgbotapi.NewMessage(message.Chat.ID, "Do you want to know how to use me?")
-		//button := tgbotapi.InlineKeyboardButton{Text: "yes", CallbackData: "help"}
+		button := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(helpButton),
+			tgbotapi.NewInlineKeyboardRow(skipButton))
+		msg.ReplyMarkup = button
+		bot.Send(msg)
+	} else if message.Text == "/help" {
+		genGuide(bot, message)
 	}
-
-	return msg
 }

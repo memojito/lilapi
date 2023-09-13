@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	bot "github.com/memojito/lilapi/bot"
+	"github.com/memojito/lilapi/bot"
 	"log"
 	"net/http"
 	"os"
