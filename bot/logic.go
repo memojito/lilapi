@@ -11,8 +11,15 @@ import (
 )
 
 type Transaction struct {
-	name  string
-	price int
+	name   string
+	price  int
+	userID int64
+}
+
+type User struct {
+	ID        int64
+	FirstName string
+	LastName  string
 }
 
 func InitBot(token string, session *gocql.Session) {
@@ -38,6 +45,11 @@ func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, session *db.S
 
 	for u := range updates {
 		if u.Message != nil { // If we got a message
+			if _, err := session.GetUser(u.Message.From.ID); err != nil { // check if user is new
+				session.SaveUser(u.Message.From.ID, u.Message.From.FirstName, u.Message.From.LastName)
+				msg := tgbotapi.NewMessage(u.Message.Chat.ID, "Hi, "+u.Message.From.FirstName+"! You're new around here!")
+				bot.Send(msg)
+			}
 			if u.Message.IsCommand() {
 				handleCommand(bot, u.Message)
 			} else {
@@ -47,13 +59,27 @@ func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, session *db.S
 					bot.Send(msg)
 				} else {
 					// save transaction
-					session.SaveTransaction(transaction.name, transaction.price)
+					session.SaveTransaction(transaction.name, transaction.price, transaction.userID)
+					transactions, _ := session.GetAllTransactionsByUserId(u.Message.From.ID)
+					total := float64(countDailyTotal(transactions)) / 100
+					totalString := strconv.FormatFloat(total, 'f', 2, 64) //
+					msg := tgbotapi.NewMessage(u.Message.Chat.ID, "Your daily total is: "+totalString+"€")
+					bot.Send(msg)
 				}
 			}
 		} else if u.CallbackQuery != nil {
 			handleCallbackQuery(bot, u.CallbackQuery)
 		}
 	}
+}
+
+func countDailyTotal(transactions []db.Transaction) int {
+	var total int
+	for _, t := range transactions {
+		total += t.Value
+		log.Println(total)
+	}
+	return total
 }
 
 func handleTransaction(bot *tgbotapi.BotAPI, message *tgbotapi.Message) (Transaction, error) {
@@ -73,8 +99,9 @@ func handleTransaction(bot *tgbotapi.BotAPI, message *tgbotapi.Message) (Transac
 	}
 
 	return Transaction{
-		name:  name,
-		price: price,
+		name:   name,
+		price:  price,
+		userID: message.From.ID,
 	}, nil
 }
 
