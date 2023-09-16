@@ -2,13 +2,14 @@ package bot
 
 import (
 	"errors"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/jackc/pgx/v5"
-	"github.com/memojito/lilapi/db"
 	"log"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/jackc/pgx/v5"
+	"github.com/memojito/lilapi/db"
 )
 
 type Transaction struct {

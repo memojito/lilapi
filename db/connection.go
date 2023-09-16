@@ -2,8 +2,9 @@ package db
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5"
 	"log"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func NewConn(url string) (*pgx.Conn, error) {

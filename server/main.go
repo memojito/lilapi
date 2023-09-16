@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/memojito/lilapi/bot"
-	"github.com/memojito/lilapi/db"
 	"log"
 	"os"
+
+	"github.com/memojito/lilapi/bot"
+	"github.com/memojito/lilapi/db"
 )
 
 func main() {

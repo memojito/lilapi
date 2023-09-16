@@ -2,15 +2,11 @@ package db
 
 import (
 	"context"
-	"github.com/gocql/gocql"
-	"github.com/jackc/pgx/v5"
 	"log"
 	"time"
-)
 
-type Session struct {
-	Session *gocql.Session
-}
+	"github.com/jackc/pgx/v5"
+)
 
 type Conn struct {
 	Conn *pgx.Conn
