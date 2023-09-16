@@ -1,31 +1,27 @@
 version: '3.9'
 
 services:
-  cassandra:
-    image: cassandra:latest
-    container_name: lilcassandra
+  postgres:
+    image: postgres:latest
+    container_name: lilpostgres
     environment:
-      - "CASSANDRA_CLUSTER_NAME=my-cassandra-cluster"
+      POSTGRES_USER: lil
+      POSTGRES_PASSWORD: lil
+      POSTGRES_DB: lil
     ports:
-      - "9042:9042"
-    expose:
-      - "9042"
-      - "7000"
-      - "7001"
-      - "9160"
+      - "5432:5432"
     volumes:
-      - ./data:/var/lib/cassandra
-      - ./db-init.sh:/docker-entrypoint-initdb.d/db-init.sh
-      - ./db/scripts/create-keyspace.cql:/docker-entrypoint-initdb.d/db/scripts/create-keyspace.cql
-      - ./db/scripts/schema.cql:/docker-entrypoint-initdb.d/db/scripts/schema.cql
+      - database_data:/var/lib/postgresql/data
+      - ./db/init-scripts/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     restart: unless-stopped
 
   server:
     depends_on:
-      - cassandra
+      - postgres
     container_name: lilapi-server
     environment:
       - "TELEGRAM_BOT_API_TOKEN=${TELEGRAM_BOT_API_TOKEN}"
+      - "POSTGRESQL_URL=${POSTGRESQL_URL}"
     ports:
       - "8080:8080"
     command:
@@ -33,3 +29,7 @@ services:
     build:
       context: .
     restart: unless-stopped
+
+volumes:
+  database_data:
+    driver: local

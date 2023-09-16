@@ -3,11 +3,12 @@ package bot
 import (
 	"errors"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/gocql/gocql"
+	"github.com/jackc/pgx/v5"
 	"github.com/memojito/lilapi/db"
 	"log"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Transaction struct {
@@ -22,7 +23,7 @@ type User struct {
 	LastName  string
 }
 
-func InitBot(token string, session *gocql.Session) {
+func InitBot(token string, conn *pgx.Conn) {
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		log.Panic(err)
@@ -35,18 +36,18 @@ func InitBot(token string, session *gocql.Session) {
 	update := tgbotapi.NewUpdate(0)
 	update.Timeout = 60
 
-	s := &db.Session{Session: session}
+	c := &db.Conn{Conn: conn}
 
-	updateBot(bot, update, s)
+	updateBot(bot, update, c)
 }
 
-func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, session *db.Session) {
+func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, conn *db.Conn) {
 	updates := bot.GetUpdatesChan(update)
 
 	for u := range updates {
 		if u.Message != nil { // If we got a message
-			if _, err := session.GetUser(u.Message.From.ID); err != nil { // check if user is new
-				session.SaveUser(u.Message.From.ID, u.Message.From.FirstName, u.Message.From.LastName)
+			if _, err := conn.GetUser(u.Message.From.ID); err != nil { // check if user is new
+				conn.SaveUser(u.Message.From.ID, u.Message.From.FirstName, u.Message.From.LastName)
 				msg := tgbotapi.NewMessage(u.Message.Chat.ID, "Hi, "+u.Message.From.FirstName+"! You're new around here!")
 				bot.Send(msg)
 			}
@@ -58,9 +59,11 @@ func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, session *db.S
 					msg := tgbotapi.NewMessage(u.Message.Chat.ID, "Invalid Transaction!")
 					bot.Send(msg)
 				} else {
-					// save transaction
-					session.SaveTransaction(transaction.name, transaction.price, transaction.userID)
-					transactions, _ := session.GetAllTransactionsByUserId(u.Message.From.ID)
+					//save transaction
+					conn.SaveTransaction(transaction.name, transaction.price, transaction.userID)
+					transactions, _ := conn.GetAllTransactionsByUserIdAndDate(u.Message.From.ID, time.Now())
+
+					//count daily total
 					total := float64(countDailyTotal(transactions)) / 100
 					totalString := strconv.FormatFloat(total, 'f', 2, 64) //
 					msg := tgbotapi.NewMessage(u.Message.Chat.ID, "Your daily total is: "+totalString+"€")

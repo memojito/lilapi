@@ -1,1 +1,0 @@
-CREATE KEYSPACE IF NOT EXISTS lilapi WITH replication = {'class':'SimpleStrategy','replication_factor':1};

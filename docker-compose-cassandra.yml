@@ -12,5 +12,5 @@ services:
       - ./data:/var/lib/cassandra
       - ./db-init.sh:/docker-entrypoint-initdb.d/db-init.sh
       - ./db/scripts/create-keyspace.cql:/docker-entrypoint-initdb.d/db/scripts/create-keyspace.cql
-      - ./db/scripts/schema.cql:/docker-entrypoint-initdb.d/db/scripts/schema.cql
+      - ./db/scripts/schema.sql:/docker-entrypoint-initdb.d/db/scripts/schema.sql
     restart: always
