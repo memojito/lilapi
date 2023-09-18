@@ -56,13 +56,19 @@ func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, conn *db.Conn
 				handleCommand(bot, u.Message)
 			} else {
 				transaction, err := handleTransaction(bot, u.Message)
+				category, _ := conn.GetCategoryByName(transaction.Name, transaction.UserID)
 				if err != nil {
 					msg := tgbotapi.NewMessage(u.Message.Chat.ID, "Invalid Transaction!")
 					bot.Send(msg)
+				} else if category.ID == 0 {
+					msg := tgbotapi.NewMessage(u.Message.Chat.ID, "\""+transaction.Name+"\" is a new category!")
+					bot.Send(msg)
+
+					handleCategory(bot, u.Message, transaction.Name)
 				} else {
 					//save transaction
-					conn.SaveTransaction(transaction.name, transaction.price, transaction.userID)
-					transactions, _ := conn.GetAllTransactionsByUserIdAndDate(u.Message.From.ID, time.Now())
+					conn.SaveTransaction(transaction.Name, transaction.Value, transaction.UserID, category.ID)
+					transactions, _ := conn.GetTransactions(u.Message.From.ID, time.Now())
 
 					//count daily total
 					total := float64(countDailyTotal(transactions)) / 100
@@ -72,7 +78,7 @@ func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, conn *db.Conn
 				}
 			}
 		} else if u.CallbackQuery != nil {
-			handleCallbackQuery(bot, u.CallbackQuery)
+			handleCallbackQuery(bot, u.CallbackQuery, conn)
 		}
 	}
 }
@@ -86,10 +92,22 @@ func countDailyTotal(transactions []db.Transaction) int {
 	return total
 }
 
-func handleTransaction(bot *tgbotapi.BotAPI, message *tgbotapi.Message) (Transaction, error) {
+func handleCategory(bot *tgbotapi.BotAPI, message *tgbotapi.Message, name string) {
+	yesButton := tgbotapi.NewInlineKeyboardButtonData("Yes", "Saving category "+name)
+	noButton := tgbotapi.NewInlineKeyboardButtonData("No", "Reset")
+
+	msg := tgbotapi.NewMessage(message.Chat.ID, "Do you want to save \""+name+"\" as a new category?")
+	button := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(yesButton),
+		tgbotapi.NewInlineKeyboardRow(noButton))
+	msg.ReplyMarkup = button
+	bot.Send(msg)
+}
+
+func handleTransaction(bot *tgbotapi.BotAPI, message *tgbotapi.Message) (db.Transaction, error) {
 	parts := strings.Fields(message.Text)
 	if len(parts) != 2 {
-		return Transaction{}, errors.New("Invalid Transaction!")
+		return db.Transaction{}, errors.New("Invalid Transaction!")
 	}
 
 	name := parts[0]
@@ -99,13 +117,13 @@ func handleTransaction(bot *tgbotapi.BotAPI, message *tgbotapi.Message) (Transac
 
 	price, err := strconv.Atoi(priceStr)
 	if err != nil {
-		return Transaction{}, errors.New("Invalid Transaction!")
+		return db.Transaction{}, errors.New("Invalid Transaction!")
 	}
 
-	return Transaction{
-		name:   name,
-		price:  price,
-		userID: message.From.ID,
+	return db.Transaction{
+		Name:   name,
+		Value:  price,
+		UserID: message.From.ID,
 	}, nil
 }
 
@@ -121,16 +139,30 @@ func genGuide(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
 	bot.Send(msg)
 }
 
-func handleCallbackQuery(bot *tgbotapi.BotAPI, cq *tgbotapi.CallbackQuery) {
+func handleCallbackQuery(bot *tgbotapi.BotAPI, cq *tgbotapi.CallbackQuery, conn *db.Conn) {
 	var answer tgbotapi.CallbackConfig
 
 	answer = tgbotapi.NewCallback(cq.ID, cq.Data)
 	bot.Send(answer)
 
-	switch cq.Data {
-	case "I will!":
+	log.Println(cq.Message.Text)
+
+	s := cq.Data
+
+	switch {
+	case strings.Contains(s, "I will!"):
 		genGuide(bot, cq.Message)
-	case "Have fun!":
+	case strings.Contains(s, "Have fun!"):
+		msg := tgbotapi.NewMessage(cq.Message.Chat.ID, "What did you spend today?")
+		bot.Send(msg)
+	case strings.Contains(s, "Saving category"):
+		parts := strings.Fields(cq.Data)
+		name := parts[2]
+		conn.SaveCategory(name, cq.From.ID)
+
+		msg := tgbotapi.NewMessage(cq.Message.Chat.ID, "Category \""+name+"\" saved!")
+		bot.Send(msg)
+	default:
 		msg := tgbotapi.NewMessage(cq.Message.Chat.ID, "What did you spend today?")
 		bot.Send(msg)
 	}

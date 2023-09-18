@@ -18,6 +18,13 @@ type Transaction struct {
 	Value        int
 	UserID       int64     `db:"user_id"`
 	CreationDate time.Time `db:"creation_date"`
+	CategoryID   int64     `db:"category_id"`
+}
+
+type Category struct {
+	ID     int64
+	Name   string
+	UserID int64 `db:"user_id"`
 }
 
 type User struct {
@@ -26,17 +33,20 @@ type User struct {
 	LastName  string
 }
 
-func (conn Conn) SaveTransaction(name string, price int, userID int64) {
-	if _, err := conn.Conn.Exec(context.Background(), `INSERT INTO transaction (name, value, user_id, creation_date) VALUES ($1, $2, $3, $4)`,
-		name, price, userID, time.Now()); err != nil {
+func (conn *Conn) SaveTransaction(name string, price int, userID int64, categoryID int64) {
+	q := "INSERT INTO transaction (name, value, user_id, creation_date, category_id) VALUES ($1, $2, $3, $4, $5)"
+
+	if _, err := conn.Conn.Exec(context.Background(), q, name, price, userID, time.Now(), categoryID); err != nil {
 		log.Println(err)
 		return
 	}
 }
 
-func (conn Conn) GetTransaction(id int64) (Transaction, error) {
+func (conn *Conn) GetTransaction(id int64) (Transaction, error) {
 	transaction := Transaction{}
-	if err := conn.Conn.QueryRow(context.Background(), `SELECT id, name, value, user_id FROM transaction WHERE id = $1`, id).Scan(&transaction.ID,
+	q := "SELECT id, name, value, user_id, creation_date, category_id FROM transaction WHERE id = $1"
+
+	if err := conn.Conn.QueryRow(context.Background(), q, id).Scan(&transaction.ID,
 		&transaction.Name, &transaction.Value, &transaction.Value); err != nil {
 		log.Println(err)
 		return Transaction{}, err
@@ -44,8 +54,8 @@ func (conn Conn) GetTransaction(id int64) (Transaction, error) {
 	return transaction, nil
 }
 
-func (conn Conn) GetAllTransactionsByUserIdAndDate(userID int64, date time.Time) ([]Transaction, error) {
-	q := `SELECT id, name, value, user_id, creation_date FROM transaction WHERE (user_id = $1 AND creation_date = $2)`
+func (conn *Conn) GetTransactions(userID int64, date time.Time) ([]Transaction, error) {
+	q := "SELECT id, name, value, user_id, creation_date, category_id FROM transaction WHERE (user_id = $1 AND creation_date = $2)"
 
 	rows, err := conn.Conn.Query(context.Background(), q, userID, date)
 	if err != nil {
@@ -66,17 +76,71 @@ func (conn Conn) GetAllTransactionsByUserIdAndDate(userID int64, date time.Time)
 	return transactions, nil
 }
 
-func (conn Conn) SaveUser(id int64, firstName string, lastName string) {
-	if _, err := conn.Conn.Exec(context.Background(), `INSERT INTO teleuser (id, first_name, last_name) VALUES ($1, $2, $3)`,
-		id, firstName, lastName); err != nil {
+func (conn *Conn) SaveCategory(name string, userID int64) {
+	q := "INSERT INTO category (name, user_id) VALUES ($1, $2)"
+
+	if _, err := conn.Conn.Exec(context.Background(), q, name, userID); err != nil {
 		log.Println(err)
 		return
 	}
 }
 
-func (conn Conn) GetUser(id int64) (User, error) {
+func (conn *Conn) GetCategory(id int64) (Category, error) {
+	category := Category{}
+	q := "SELECT id, name, user_id FROM category WHERE id = $1"
+
+	if err := conn.Conn.QueryRow(context.Background(), q, id).Scan(&category.ID,
+		&category.Name, &category.UserID); err != nil {
+		log.Println(err)
+		return Category{}, err
+	}
+	return category, nil
+}
+
+func (conn *Conn) GetCategoryByName(name string, userID int64) (Category, error) {
+	category := Category{}
+	q := "SELECT id, name, user_id FROM category WHERE (name = $1 AND user_id = $2)"
+
+	if err := conn.Conn.QueryRow(context.Background(), q, name, userID).Scan(&category.ID,
+		&category.Name, &category.UserID); err != nil {
+		log.Println(err)
+		return Category{}, err
+	}
+	return category, nil
+}
+
+func (conn *Conn) GetCategories(userID int64) ([]Category, error) {
+	q := "SELECT id, name, user_id FROM category WHERE user_id = $1"
+
+	rows, err := conn.Conn.Query(context.Background(), q, userID)
+	if err != nil {
+		log.Printf("Failed query: %s\n", err)
+		return nil, err
+	}
+
+	categories, err := pgx.CollectRows(rows, pgx.RowToStructByName[Category])
+	if err != nil {
+		log.Printf("Failed collecting rows: %s\n", err)
+		return nil, err
+	}
+
+	return categories, nil
+}
+
+func (conn *Conn) SaveUser(id int64, firstName string, lastName string) {
+	q := "INSERT INTO teleuser (id, first_name, last_name) VALUES ($1, $2, $3)"
+
+	if _, err := conn.Conn.Exec(context.Background(), q, id, firstName, lastName); err != nil {
+		log.Println(err)
+		return
+	}
+}
+
+func (conn *Conn) GetUser(id int64) (User, error) {
 	user := User{}
-	if err := conn.Conn.QueryRow(context.Background(), `SELECT id, first_name, last_name FROM teleuser WHERE id = $1`, id).Scan(&user.ID,
+	q := "SELECT id, first_name, last_name FROM teleuser WHERE id = $1"
+
+	if err := conn.Conn.QueryRow(context.Background(), q, id).Scan(&user.ID,
 		&user.FirstName, &user.LastName); err != nil {
 		log.Println(err)
 		return User{}, err
