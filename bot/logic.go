@@ -53,7 +53,7 @@ func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, conn *db.Conn
 				bot.Send(msg)
 			}
 			if u.Message.IsCommand() {
-				handleCommand(bot, u.Message)
+				handleCommand(bot, u.Message, conn)
 			} else {
 				transaction, err := handleTransaction(bot, u.Message)
 				category, _ := conn.GetCategoryByName(transaction.Name, transaction.UserID)
@@ -64,7 +64,7 @@ func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, conn *db.Conn
 					msg := tgbotapi.NewMessage(u.Message.Chat.ID, "\""+transaction.Name+"\" is a new category!")
 					bot.Send(msg)
 
-					handleCategory(bot, u.Message, transaction.Name)
+					handleCategory(bot, u.Message, transaction.Name, transaction.Value)
 				} else {
 					//save transaction
 					conn.SaveTransaction(transaction.Name, transaction.Value, transaction.UserID, category.ID)
@@ -72,9 +72,7 @@ func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, conn *db.Conn
 
 					//count daily total
 					total := float64(countDailyTotal(transactions)) / 100
-					totalString := strconv.FormatFloat(total, 'f', 2, 64) //
-					msg := tgbotapi.NewMessage(u.Message.Chat.ID, "Your daily total is: "+totalString+"€")
-					bot.Send(msg)
+					handleTotal(bot, u.Message.Chat.ID, total)
 				}
 			}
 		} else if u.CallbackQuery != nil {
@@ -87,14 +85,21 @@ func countDailyTotal(transactions []db.Transaction) int {
 	var total int
 	for _, t := range transactions {
 		total += t.Value
-		log.Println(total)
 	}
 	return total
 }
 
-func handleCategory(bot *tgbotapi.BotAPI, message *tgbotapi.Message, name string) {
-	yesButton := tgbotapi.NewInlineKeyboardButtonData("Yes", "Saving category "+name)
+func handleTotal(bot *tgbotapi.BotAPI, chatID int64, total float64) {
+	totalString := strconv.FormatFloat(total, 'f', 2, 64) //
+	msg := tgbotapi.NewMessage(chatID, "Spent today: "+totalString+"€")
+	bot.Send(msg)
+}
+
+func handleCategory(bot *tgbotapi.BotAPI, message *tgbotapi.Message, name string, value int) {
+	yesButton := tgbotapi.NewInlineKeyboardButtonData("Yes", "Saving category "+name+" "+strconv.Itoa(value))
 	noButton := tgbotapi.NewInlineKeyboardButtonData("No", "Reset")
+
+	//log.Printf("Value is: %s", strconv.Itoa(value))
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, "Do you want to save \""+name+"\" as a new category?")
 	button := tgbotapi.NewInlineKeyboardMarkup(
@@ -121,7 +126,7 @@ func handleTransaction(bot *tgbotapi.BotAPI, message *tgbotapi.Message) (db.Tran
 	}
 
 	return db.Transaction{
-		Name:   name,
+		Name:   strings.ToLower(name),
 		Value:  price,
 		UserID: message.From.ID,
 	}, nil
@@ -145,7 +150,7 @@ func handleCallbackQuery(bot *tgbotapi.BotAPI, cq *tgbotapi.CallbackQuery, conn 
 	answer = tgbotapi.NewCallback(cq.ID, cq.Data)
 	bot.Send(answer)
 
-	log.Println(cq.Message.Text)
+	//log.Println(cq.Message.Text)
 
 	s := cq.Data
 
@@ -158,24 +163,34 @@ func handleCallbackQuery(bot *tgbotapi.BotAPI, cq *tgbotapi.CallbackQuery, conn 
 	case strings.Contains(s, "Saving category"):
 		parts := strings.Fields(cq.Data)
 		name := parts[2]
-		conn.SaveCategory(name, cq.From.ID)
+		valueStr := parts[3]
+		value, _ := strconv.Atoi(valueStr)
+		id := conn.SaveCategory(name, cq.From.ID)
+		conn.SaveTransaction(name, value, cq.From.ID, id)
 
 		msg := tgbotapi.NewMessage(cq.Message.Chat.ID, "Category \""+name+"\" saved!")
 		bot.Send(msg)
+
+		transactions, _ := conn.GetTransactions(cq.From.ID, time.Now())
+
+		//count daily total
+		total := float64(countDailyTotal(transactions)) / 100
+		handleTotal(bot, cq.Message.Chat.ID, total)
 	default:
 		msg := tgbotapi.NewMessage(cq.Message.Chat.ID, "What did you spend today?")
 		bot.Send(msg)
 	}
 }
 
-func handleCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
+func handleCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message, conn *db.Conn) {
 	log.Printf("[%s] %s", message.From.UserName, message.Text)
 	var msg tgbotapi.MessageConfig
 
 	helpButton := tgbotapi.NewInlineKeyboardButtonData("Help me", "I will!")
 	skipButton := tgbotapi.NewInlineKeyboardButtonData("Skip", "Have fun!")
 
-	if message.Text == "/start" {
+	switch message.Text {
+	case "/start":
 		msg = tgbotapi.NewMessage(message.Chat.ID, "Welcome! This bot helps you to get more control over your expenses")
 		bot.Send(msg)
 		msg = tgbotapi.NewMessage(message.Chat.ID, "Do you want to know how to use me?")
@@ -184,7 +199,9 @@ func handleCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
 			tgbotapi.NewInlineKeyboardRow(skipButton))
 		msg.ReplyMarkup = button
 		bot.Send(msg)
-	} else if message.Text == "/help" {
+	case "/help":
 		genGuide(bot, message)
+	case "/weekly":
+		//transactions, _ := conn.GetTransactionsByCategory(message.From.ID, GetStartDayOfWeek(time.Now()), time.Now(), 0)
 	}
 }
