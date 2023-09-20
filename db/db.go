@@ -76,13 +76,39 @@ func (conn *Conn) GetTransactions(userID int64, date time.Time) ([]Transaction, 
 	return transactions, nil
 }
 
-func (conn *Conn) SaveCategory(name string, userID int64) {
-	q := "INSERT INTO category (name, user_id) VALUES ($1, $2)"
+func (conn *Conn) GetTransactionsByCategory(userID int64, dateFrom time.Time, dateTo time.Time, categoryID int64) ([]Transaction, error) {
+	q := "SELECT id, name, value, user_id, creation_date, category_id FROM transaction WHERE (user_id = $1 AND creation_date = $2)"
 
-	if _, err := conn.Conn.Exec(context.Background(), q, name, userID); err != nil {
-		log.Println(err)
-		return
+	rows, err := conn.Conn.Query(context.Background(), q, userID, dateFrom)
+	if err != nil {
+		log.Printf("Failed query: %s\n", err)
+		return nil, err
 	}
+
+	transactions, err := pgx.CollectRows(rows, pgx.RowToStructByName[Transaction])
+	if err != nil {
+		log.Printf("Failed collecting rows: %s\n", err)
+		return nil, err
+	}
+
+	for _, t := range transactions {
+		log.Println(t)
+	}
+
+	return transactions, nil
+}
+
+func (conn *Conn) SaveCategory(name string, userID int64) int64 {
+	q := "INSERT INTO category (name, user_id) VALUES ($1, $2) RETURNING id"
+
+	var id int64
+
+	if err := conn.Conn.QueryRow(context.Background(), q, name, userID).Scan(&id); err != nil {
+		log.Println(err)
+		return 0
+	}
+	//log.Printf("Saved category id: %s\n", id)
+	return id
 }
 
 func (conn *Conn) GetCategory(id int64) (Category, error) {
