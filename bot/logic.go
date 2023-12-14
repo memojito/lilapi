@@ -3,6 +3,7 @@ package bot
 import (
 	"errors"
 	"log"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -89,6 +90,10 @@ func countDailyTotal(transactions []db.Transaction) int {
 	return total
 }
 
+func countWeeclyTotal(transactions []db.Transaction) int {
+	return 0
+}
+
 func handleTotal(bot *tgbotapi.BotAPI, chatID int64, total float64) {
 	totalString := strconv.FormatFloat(total, 'f', 2, 64) //
 	msg := tgbotapi.NewMessage(chatID, "Spent today: "+totalString+"€")
@@ -117,7 +122,18 @@ func handleTransaction(bot *tgbotapi.BotAPI, message *tgbotapi.Message) (db.Tran
 
 	name := parts[0]
 
-	priceStr := strings.ReplaceAll(parts[1], ",", "")
+	// validate and transform transaction
+	priceStr := parts[1]
+	if !strings.Contains(priceStr, ",") && !strings.Contains(priceStr, ".") {
+		priceStr = priceStr + "00"
+	} else {
+		pattern := `[,.].{2}`
+		match, _ := regexp.MatchString(pattern, priceStr)
+		if !match {
+			return db.Transaction{}, errors.New("Invalid Transaction!")
+		}
+	}
+	priceStr = strings.ReplaceAll(priceStr, ",", "")
 	priceStr = strings.ReplaceAll(priceStr, ".", "")
 
 	price, err := strconv.Atoi(priceStr)
