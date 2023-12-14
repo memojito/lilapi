@@ -76,10 +76,10 @@ func (conn *Conn) GetTransactions(userID int64, date time.Time) ([]Transaction, 
 	return transactions, nil
 }
 
-func (conn *Conn) GetTransactionsByCategory(userID int64, dateFrom time.Time, dateTo time.Time, categoryID int64) ([]Transaction, error) {
-	q := "SELECT id, name, value, user_id, creation_date, category_id FROM transaction WHERE (user_id = $1 AND creation_date = $2)"
+func (conn *Conn) GetTransactionsByDate(userID int64, dateFrom time.Time, dateTo time.Time) ([]Transaction, error) {
+	q := "SELECT id, name, value, user_id, creation_date, category_id FROM transaction WHERE (user_id = $1 AND creation_date BETWEEN $2 AND $3)"
 
-	rows, err := conn.Conn.Query(context.Background(), q, userID, dateFrom)
+	rows, err := conn.Conn.Query(context.Background(), q, userID, dateFrom, dateTo)
 	if err != nil {
 		log.Printf("Failed query: %s\n", err)
 		return nil, err

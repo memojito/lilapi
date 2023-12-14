@@ -72,8 +72,8 @@ func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, conn *db.Conn
 					transactions, _ := conn.GetTransactions(u.Message.From.ID, time.Now())
 
 					//count daily total
-					total := float64(countDailyTotal(transactions)) / 100
-					handleTotal(bot, u.Message.Chat.ID, total)
+					ttl := float64(total(transactions)) / 100
+					handleTotal(bot, u.Message.Chat.ID, "today", ttl)
 				}
 			}
 		} else if u.CallbackQuery != nil {
@@ -82,21 +82,17 @@ func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, conn *db.Conn
 	}
 }
 
-func countDailyTotal(transactions []db.Transaction) int {
-	var total int
+func total(transactions []db.Transaction) int {
+	var ttl int
 	for _, t := range transactions {
-		total += t.Value
+		ttl += t.Value
 	}
-	return total
+	return ttl
 }
 
-func countWeeclyTotal(transactions []db.Transaction) int {
-	return 0
-}
-
-func handleTotal(bot *tgbotapi.BotAPI, chatID int64, total float64) {
+func handleTotal(bot *tgbotapi.BotAPI, chatID int64, period string, total float64) {
 	totalString := strconv.FormatFloat(total, 'f', 2, 64) //
-	msg := tgbotapi.NewMessage(chatID, "Spent today: "+totalString+"€")
+	msg := tgbotapi.NewMessage(chatID, "Spent "+period+": "+totalString+"€")
 	bot.Send(msg)
 }
 
@@ -190,8 +186,8 @@ func handleCallbackQuery(bot *tgbotapi.BotAPI, cq *tgbotapi.CallbackQuery, conn 
 		transactions, _ := conn.GetTransactions(cq.From.ID, time.Now())
 
 		//count daily total
-		total := float64(countDailyTotal(transactions)) / 100
-		handleTotal(bot, cq.Message.Chat.ID, total)
+		total := float64(total(transactions)) / 100
+		handleTotal(bot, cq.Message.Chat.ID, "today", total)
 	default:
 		msg := tgbotapi.NewMessage(cq.Message.Chat.ID, "What did you spend today?")
 		bot.Send(msg)
@@ -218,6 +214,9 @@ func handleCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message, conn *db.Con
 	case "/help":
 		genGuide(bot, message)
 	case "/weekly":
-		//transactions, _ := conn.GetTransactionsByCategory(message.From.ID, GetStartDayOfWeek(time.Now()), time.Now(), 0)
+		transactions, _ := conn.GetTransactionsByDate(message.From.ID, GetStartDayOfWeek(time.Now()), time.Now())
+		//count weekly total
+		ttl := float64(total(transactions)) / 100
+		handleTotal(bot, message.Chat.ID, "this week", ttl)
 	}
 }
