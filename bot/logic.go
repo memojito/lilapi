@@ -127,7 +127,7 @@ func handleTransaction(bot *tgbotapi.BotAPI, message *tgbotapi.Message) (db.Tran
 	if !strings.Contains(priceStr, ",") && !strings.Contains(priceStr, ".") {
 		priceStr = priceStr + "00"
 	} else {
-		pattern := `[,.].{2}`
+		pattern := `[.,]\d{2}$`
 		match, _ := regexp.MatchString(pattern, priceStr)
 		if !match {
 			return db.Transaction{}, errors.New("Invalid Transaction!")
