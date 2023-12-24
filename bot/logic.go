@@ -227,15 +227,14 @@ func handleCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message, conn *db.Con
 				msg = tgbotapi.NewMessage(message.Chat.ID, "There was a problem with category "+category.Name)
 				bot.Send(msg)
 			}
-
+			var tr []db.Transaction
 			for _, t := range transactions {
-				var tr []db.Transaction
 				if t.CategoryID == category.ID {
 					tr = append(tr, t)
 				}
-				ttl := float64(total(tr)) / 100
-				handleTotal(bot, message.Chat.ID, "on "+category.Name, ttl)
 			}
+			ttl := float64(total(tr)) / 100
+			handleTotal(bot, message.Chat.ID, "on "+category.Name, ttl)
 		}
 		//count weekly total
 		ttl := float64(total(transactions)) / 100
