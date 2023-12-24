@@ -215,6 +215,28 @@ func handleCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message, conn *db.Con
 		genGuide(bot, message)
 	case "/weekly":
 		transactions, _ := conn.GetTransactionsByDate(message.From.ID, GetStartDayOfWeek(time.Now()), time.Now())
+		// get category ids
+		var catID map[int64]bool
+		catID = make(map[int64]bool)
+		for _, t := range transactions {
+			catID[t.CategoryID] = true
+		}
+		for id, _ := range catID {
+			category, err := conn.GetCategory(id)
+			if err != nil {
+				msg = tgbotapi.NewMessage(message.Chat.ID, "There was a problem with category "+category.Name)
+				bot.Send(msg)
+			}
+
+			for _, t := range transactions {
+				if t.CategoryID == category.ID {
+					var tr []db.Transaction
+					tr = append(tr, t)
+					ttl := float64(total(tr)) / 100
+					handleTotal(bot, message.Chat.ID, "on "+category.Name, ttl)
+				}
+			}
+		}
 		//count weekly total
 		ttl := float64(total(transactions)) / 100
 		handleTotal(bot, message.Chat.ID, "this week", ttl)
