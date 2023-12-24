@@ -229,12 +229,12 @@ func handleCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message, conn *db.Con
 			}
 
 			for _, t := range transactions {
+				var tr []db.Transaction
 				if t.CategoryID == category.ID {
-					var tr []db.Transaction
 					tr = append(tr, t)
-					ttl := float64(total(tr)) / 100
-					handleTotal(bot, message.Chat.ID, "on "+category.Name, ttl)
 				}
+				ttl := float64(total(tr)) / 100
+				handleTotal(bot, message.Chat.ID, "on "+category.Name, ttl)
 			}
 		}
 		//count weekly total
