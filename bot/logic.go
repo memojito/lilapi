@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SebastiaanKlippert/go-wkhtmltopdf"
 	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/memojito/lilapi/db"
@@ -59,7 +60,7 @@ func updateBot(bot *tgbotapi.BotAPI, update tgbotapi.UpdateConfig, conn *db.Conn
 				transaction, err := handleTransaction(bot, u.Message)
 				category, _ := conn.GetCategoryByName(transaction.Name, transaction.UserID)
 				if err != nil {
-					msg := tgbotapi.NewMessage(u.Message.Chat.ID, "Invalid Transaction!")
+					msg := tgbotapi.NewMessage(u.Message.Chat.ID, err.Error())
 					bot.Send(msg)
 				} else if category.ID == 0 {
 					msg := tgbotapi.NewMessage(u.Message.Chat.ID, "\""+transaction.Name+"\" is a new category!")
@@ -111,6 +112,32 @@ func handleCategory(bot *tgbotapi.BotAPI, message *tgbotapi.Message, name string
 }
 
 func handleTransaction(bot *tgbotapi.BotAPI, message *tgbotapi.Message) (db.Transaction, error) {
+	matchLink, _ := regexp.MatchString(`\b(?:https?|ftp):\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:\/[-a-zA-Z0-9()@:%_\+.~#?&//=]*)?`, message.Text)
+	if matchLink {
+		msg := tgbotapi.NewMessage(message.Chat.ID, "Link detected -> Converting to pdf...")
+		bot.Send(msg)
+		// Create new PDF generator
+		pdfg, err := wkhtmltopdf.NewPDFGenerator()
+		if err != nil {
+			return db.Transaction{}, err
+		}
+
+		// Set PDF options
+		pdfg.AddPage(wkhtmltopdf.NewPage(message.Text))
+
+		// Create PDF
+		err = pdfg.Create()
+		if err != nil {
+			return db.Transaction{}, errors.New("Could not create the pdf!")
+		}
+
+		fileData := tgbotapi.FileBytes{
+			Name:  "file.pdf",
+			Bytes: pdfg.Bytes(),
+		}
+		bot.Send(tgbotapi.NewDocument(message.Chat.ID, fileData))
+		return db.Transaction{}, errors.New("Here you go!")
+	}
 	parts := strings.Fields(message.Text)
 	if len(parts) != 2 {
 		return db.Transaction{}, errors.New("Invalid Transaction!")
