@@ -21,7 +21,6 @@ func main() {
 	}
 
 	token := os.Getenv("TELEGRAM_BOT_API_TOKEN")
-	//token := "6387593722:AAEMJFr0OFXKl9Zs1r_-0Peho26_GCQhNCo"
 	if token == "" {
 		log.Fatal("TELEGRAM_BOT_API_TOKEN not found")
 	}
